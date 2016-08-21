@@ -1,3 +1,21 @@
+/*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+ */
 package de.jwi.jspwiki.git;
 
 import java.io.File;
@@ -33,8 +51,10 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	protected GitController gitController;
 
+	protected GitUtil gitUtil;
+
 	public static final String PROP_STORAGEDIR = "jspwiki.gitAttachmentProvider.storageDir";
-	
+
 	public static final String GIT_DIR = ".git";
 
 	WikiEngine engine;
@@ -49,6 +69,8 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 		gitController = new GitController(attachmentDirectory);
 
 		gitController.init();
+
+		gitUtil = new GitUtil(engine);
 	}
 
 	public String getProviderInfo()
@@ -65,27 +87,37 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	private File getAttachmentDir(String pagename)
 	{
-		File f = new File(attachmentDirectory, pagename);
+		String name = TextUtil.urlEncodeUTF8(pagename);
+		File f = new File(attachmentDirectory, name);
+		return f;
+	}
+
+	private File getAttachmentFile(Attachment attachment)
+	{
+		File dir = getAttachmentDir(attachment);
+		String name = TextUtil.urlEncodeUTF8(attachment.getFileName());
+		File f = new File(dir, name);
 		return f;
 	}
 
 	public void putAttachmentData(Attachment attachment, InputStream data) throws ProviderException, IOException
 	{
 		File dir = getAttachmentDir(attachment);
-		
+
 		if (!dir.exists())
 		{
 			dir.mkdirs();
 		}
 
-		
-		File f = new File(dir, attachment.getFileName());
+		File f = getAttachmentFile(attachment);
 
 		FileUtils.copyInputStreamToFile(data, f);
 
+		GitAttributes gitAttributes = gitUtil.getGitAttributes(attachment);
+
 		try
 		{
-			gitController.commit(dir, "added attachment");
+			gitController.commit(dir, gitAttributes);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
@@ -94,12 +126,28 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	public InputStream getAttachmentData(Attachment attachment) throws ProviderException, IOException
 	{
-		File dir = getAttachmentDir(attachment);
-		File f = new File(dir, attachment.getFileName());
+		int version = attachment.getVersion();
+		
+		InputStream is = null;
 
-		InputStream is = FileUtils.openInputStream(f);
+		File f = getAttachmentFile(attachment);
 
-		return is;
+		if (version == WikiProvider.LATEST_VERSION)
+		{
+			is = FileUtils.openInputStream(f);
+
+			return is;
+		}
+		
+		try
+		{
+			String name = String.format("%s/%s",  attachment.getParentName(), attachment.getFileName());
+			is = gitController.readHistoryObject(name, version);
+			return is;
+		} catch (GitException e)
+		{
+			throw new ProviderException(e.getMessage());
+		}
 	}
 
 	public Collection listAttachments(WikiPage page) throws ProviderException
@@ -110,7 +158,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 		{
 			return result;
 		}
-		
+
 		String pagename = page.getName();
 
 		File dir = getAttachmentDir(pagename);
@@ -119,7 +167,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 		{
 			return result;
 		}
-		
+
 		File[] files = dir.listFiles(new FilenameFilter()
 		{
 			public boolean accept(File dir, String name)
@@ -130,7 +178,8 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		for (File f : files)
 		{
-			Attachment attachment = getAttachmentInfo(page, f.getName(),WikiProvider.LATEST_VERSION);
+			String name = TextUtil.urlDecodeUTF8(f.getName());
+			Attachment attachment = getAttachmentInfo(page, name, WikiProvider.LATEST_VERSION);
 			result.add(attachment);
 		}
 
@@ -156,7 +205,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		for (File d : directoriesWithAttachments)
 		{
-			String pagename = d.getName();
+			String pagename = TextUtil.urlDecodeUTF8(d.getName());
 
 			Collection c = listAttachments(new WikiPage(engine, pagename));
 
@@ -178,10 +227,10 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	public Attachment getAttachmentInfo(WikiPage page, String name, int version) throws ProviderException
 	{
-		
-        Attachment attachment = new Attachment( engine, page.getName(), name);
 
-        List<Attachment> versions;
+		Attachment attachment = new Attachment(engine, page.getName(), name);
+
+		List<Attachment> versions;
 		try
 		{
 			versions = getVersionHistoryExc(attachment);
@@ -189,13 +238,13 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 		{
 			throw new ProviderException(e.getMessage());
 		}
-        
-        if( version == WikiProvider.LATEST_VERSION )
-        {
-            return (Attachment)versions.get(0);
-        }
-        
-    	for (Attachment a : versions)
+
+		if (version == WikiProvider.LATEST_VERSION)
+		{
+			return (Attachment) versions.get(0);
+		}
+
+		for (Attachment a : versions)
 		{
 			if (a.getVersion() == version)
 			{
@@ -215,7 +264,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 		{
 			log.error(e);
 		}
-		
+
 		return null;
 	}
 
@@ -225,13 +274,12 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		String pageName = attachment.getParentName();
 
-		File attachmentDir = getAttachmentDir(attachment);
+		File file = getAttachmentFile(attachment);
 
-		File file = new File(attachmentDir, attachment.getFileName());
+		String fileName = String.format("%s/%s", TextUtil.urlEncodeUTF8(pageName),
+				TextUtil.urlEncodeUTF8(file.getName()));
 
-		String fileName = String.format("%s/%s", pageName, file.getName());
-		
-		List<GitVersion> gitVersions = gitController.getVersionHistory(fileName);
+		List<GitVersion> gitVersions = gitController.getVersionHistory(fileName, true);
 
 		List<Attachment> attachmentVersions = new ArrayList<Attachment>(gitVersions.size());
 
@@ -250,6 +298,8 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 			attachmentVersion.setAuthor(gitVersion.author);
 
 			attachmentVersion.setLastModified(gitVersion.commitTime);
+			
+			attachmentVersion.setSize(gitVersion.fileSize);
 
 		}
 
@@ -265,19 +315,21 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	public void deleteAttachment(Attachment attachment) throws ProviderException
 	{
+		GitAttributes gitAttributes = gitUtil.getGitAttributes(attachment);
+
 		File attachmentDir = getAttachmentDir(attachment);
 
-		File f = new File(attachmentDir, attachment.getFileName());
+		File f = getAttachmentFile(attachment);
 
 		boolean b = f.delete();
 		if (!b)
 		{
-			throw new ProviderException("could not delete " + attachment.getFileName());
+			throw new ProviderException("could not delete " + f.getName());
 		}
 
 		try
 		{
-			gitController.commit(attachmentDir, "deleted attachment");
+			gitController.commit(attachmentDir, gitAttributes);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
@@ -286,6 +338,10 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	public void moveAttachmentsForPage(String oldParent, String newParent) throws ProviderException
 	{
+		WikiPage oldpage = engine.getPage(oldParent);
+
+		GitAttributes gitAttributes = gitUtil.getGitAttributes(oldpage);
+
 		File attachmentDirOld = getAttachmentDir(oldParent);
 		File attachmentDirNew = getAttachmentDir(newParent);
 
@@ -304,7 +360,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		try
 		{
-			gitController.commit(attachmentDirectory, "moved attachment");
+			gitController.commit(attachmentDirectory, gitAttributes);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());

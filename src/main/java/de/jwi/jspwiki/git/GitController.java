@@ -1,7 +1,27 @@
+/*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied.  See the License for the
+    specific language governing permissions and limitations
+    under the License.
+ */
+
 package de.jwi.jspwiki.git;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Date;
@@ -11,6 +31,9 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -40,16 +63,18 @@ public class GitController
 		repository = git.getRepository();
 	}
 
-	public void commit(File f, String message) throws GitException
+	public void commit(File f, GitAttributes gitAttributes) throws GitException
 	{
 		String name = f.getName();
+
+		String message = gitAttributes.changenote;
 
 		if (message == null)
 		{
 			message = "no commit message";
 		}
 
-		PersonIdent ident = new PersonIdent("Juergen Weber", "juergen@jwi.de");
+		PersonIdent ident = new PersonIdent(gitAttributes.author, gitAttributes.email);
 
 		try
 		{
@@ -66,7 +91,7 @@ public class GitController
 		}
 	}
 
-	public List<GitVersion> getVersionHistory(String fileName) throws GitException
+	public List<GitVersion> getVersionHistory(String fileName, boolean readFileSize) throws GitException
 	{
 		List<GitVersion> versions = new ArrayList<GitVersion>();
 
@@ -84,25 +109,51 @@ public class GitController
 				int commitTime = rev.getCommitTime(); // seconds since the epoch
 				long ms = (long) commitTime * 1000;
 
+				gitVersion.fileName = fileName;
 				gitVersion.author = authorIdent.getName();
 				gitVersion.changenote = changenote;
 				gitVersion.commitTime = new Date(ms);
+				
+				if (readFileSize)
+				{
+					gitVersion.fileSize = readObjectSize(rev, fileName);
+				}
 			}
 
 			return versions;
-		} catch (NoHeadException e)
+		} catch (Exception e)
 		{
 			throw new GitException(e);
-		} catch (GitAPIException e)
+		} 	}
+
+	private long readObjectSize(RevCommit revCommit, String fileName) throws MissingObjectException, IncorrectObjectTypeException, CorruptObjectException, IOException
+	{
+		ObjectReader reader = null;
+		
+		try
 		{
-			throw new GitException(e);
+			reader = repository.newObjectReader();
+
+			RevTree tree = revCommit.getTree();
+
+			TreeWalk treewalk = TreeWalk.forPath(reader, fileName, tree);
+			// open object
+			ObjectLoader loader = reader.open(treewalk.getObjectId(0));
+			
+			long size = loader.getSize();
+
+			return size;
+		} finally
+		{
+			if (reader != null)
+			{
+				reader.close();
+			}
 		}
 	}
-
-	public void readHistoryObject(File file, int version, OutputStream os) throws GitException
+	
+	public InputStream readHistoryObject(String name, int version) throws GitException
 	{
-		String name = file.getName();
-
 		ObjectReader reader = null;
 		try
 		{
@@ -127,7 +178,9 @@ public class GitController
 			// open object
 			ObjectLoader loader = reader.open(treewalk.getObjectId(0));
 
-			loader.copyTo(os);
+			InputStream is = loader.openStream();
+			
+			return is;
 		} catch (Exception e)
 		{
 			throw new GitException(e);

@@ -19,13 +19,9 @@
 
 package de.jwi.jspwiki.git;
 
-import java.util.Date;
-
-public class GitVersion
+public class GitAttributes
 {
-	public String fileName;
-	public long fileSize;
-	public String changenote;
 	public String author;
-	public Date commitTime;
+	public String email;
+	public String changenote;
 }
