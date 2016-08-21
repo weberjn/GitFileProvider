@@ -63,18 +63,18 @@ public class GitController
 		repository = git.getRepository();
 	}
 
-	public void commit(File f, GitAttributes gitAttributes) throws GitException
+	public void commit(File f, GitVersion gitVersion) throws GitException
 	{
 		String name = f.getName();
 
-		String message = gitAttributes.changenote;
+		String message = gitVersion.changenote;
 
 		if (message == null)
 		{
 			message = "no commit message";
 		}
 
-		PersonIdent ident = new PersonIdent(gitAttributes.author, gitAttributes.email);
+		PersonIdent ident = new PersonIdent(gitVersion.author, gitVersion.email);
 
 		try
 		{

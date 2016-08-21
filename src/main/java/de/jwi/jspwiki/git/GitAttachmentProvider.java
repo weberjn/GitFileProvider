@@ -113,11 +113,11 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		FileUtils.copyInputStreamToFile(data, f);
 
-		GitAttributes gitAttributes = gitUtil.getGitAttributes(attachment);
+		GitVersion gitVersion = gitUtil.getGitVersion(attachment);
 
 		try
 		{
-			gitController.commit(dir, gitAttributes);
+			gitController.commit(dir, gitVersion);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
@@ -315,7 +315,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 	public void deleteAttachment(Attachment attachment) throws ProviderException
 	{
-		GitAttributes gitAttributes = gitUtil.getGitAttributes(attachment);
+		GitVersion gitVersion = gitUtil.getGitVersion(attachment);
 
 		File attachmentDir = getAttachmentDir(attachment);
 
@@ -329,7 +329,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		try
 		{
-			gitController.commit(attachmentDir, gitAttributes);
+			gitController.commit(attachmentDir, gitVersion);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
@@ -340,7 +340,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 	{
 		WikiPage oldpage = engine.getPage(oldParent);
 
-		GitAttributes gitAttributes = gitUtil.getGitAttributes(oldpage);
+		GitVersion gitVersion = gitUtil.getGitVersion(oldpage);
 
 		File attachmentDirOld = getAttachmentDir(oldParent);
 		File attachmentDirNew = getAttachmentDir(newParent);
@@ -360,7 +360,7 @@ public class GitAttachmentProvider implements WikiAttachmentProvider
 
 		try
 		{
-			gitController.commit(attachmentDirectory, gitAttributes);
+			gitController.commit(attachmentDirectory, gitVersion);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());

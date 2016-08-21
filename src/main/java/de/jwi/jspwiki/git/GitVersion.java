@@ -23,9 +23,11 @@ import java.util.Date;
 
 public class GitVersion
 {
+	public String author;
+	public String email;
+	public String changenote;
+	public Date commitTime;
+
 	public String fileName;
 	public long fileSize;
-	public String changenote;
-	public String author;
-	public Date commitTime;
 }

@@ -34,29 +34,29 @@ public class GitUtil
 		this.engine = engine;
 	}
 
-	protected GitAttributes getGitAttributes(WikiPage page)
+	protected GitVersion getGitVersion(WikiPage page)
 	{
-		GitAttributes gitAttributes = new GitAttributes();
+		GitVersion gitVersion = new GitVersion();
 
-		gitAttributes.author = page.getAuthor();
-		gitAttributes.changenote = (String) page.getAttribute(WikiPage.CHANGENOTE);
+		gitVersion.author = page.getAuthor();
+		gitVersion.changenote = (String) page.getAttribute(WikiPage.CHANGENOTE);
 
-		gitAttributes.email = null;
+		gitVersion.email = null;
 
 		UserDatabase userDatabase = engine.getUserManager().getUserDatabase();
 
 		try
 		{
-			UserProfile userProfile = userDatabase.find(gitAttributes.author);
-			gitAttributes.email = userProfile.getEmail();
+			UserProfile userProfile = userDatabase.find(gitVersion.author);
+			gitVersion.email = userProfile.getEmail();
 
 		} catch (NoSuchPrincipalException e1)
 		{
-			gitAttributes.author = "unknown";
-			gitAttributes.email = "unknown@unknown";
+			gitVersion.author = "unknown";
+			gitVersion.email = "unknown@unknown";
 		}
 
-		return gitAttributes;
+		return gitVersion;
 	}
 
 }

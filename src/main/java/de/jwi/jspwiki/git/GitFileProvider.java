@@ -81,11 +81,11 @@ public class GitFileProvider extends AbstractFileProvider
 		
 		File f = findPage(page.getName());
 
-		GitAttributes gitAttributes = gitUtil.getGitAttributes(page);
+		GitVersion gitVersion = gitUtil.getGitVersion(page);
 
 		try
 		{
-			gitController.commit(f, gitAttributes);
+			gitController.commit(f, gitVersion);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
@@ -138,7 +138,7 @@ public class GitFileProvider extends AbstractFileProvider
 
 		try
 		{
-			gitController.commit(pageDirectory, gitUtil.getGitAttributes(page));
+			gitController.commit(pageDirectory, gitUtil.getGitVersion(page));
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
@@ -148,7 +148,7 @@ public class GitFileProvider extends AbstractFileProvider
 	public void movePage(String from, String to) throws ProviderException
 	{
 		WikiPage page = getPageInfo(from, WikiPageProvider.LATEST_VERSION);
-		GitAttributes gitAttributes = gitUtil.getGitAttributes(page);
+		GitVersion gitVersion = gitUtil.getGitVersion(page);
 		
 		File ffrom = findPage(from);
 		File fto = findPage(to);
@@ -161,7 +161,7 @@ public class GitFileProvider extends AbstractFileProvider
 
 		try
 		{
-			gitController.commit(pageDirectory, gitAttributes);
+			gitController.commit(pageDirectory, gitVersion);
 		} catch (GitException e)
 		{
 			throw new ProviderException(e.getMessage());
