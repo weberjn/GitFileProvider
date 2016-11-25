@@ -1,20 +1,18 @@
 /*
-    Licensed to the Apache Software Foundation (ASF) under one
-    or more contributor license agreements.  See the NOTICE file
-    distributed with this work for additional information
-    regarding copyright ownership.  The ASF licenses this file
-    to you under the Apache License, Version 2.0 (the
-    "License"); you may not use this file except in compliance
-    with the License.  You may obtain a copy of the License at
 
-       http://www.apache.org/licenses/LICENSE-2.0
+	Copyright 2016 Jürgen Weber
 
-    Unless required by applicable law or agreed to in writing,
-    software distributed under the License is distributed on an
-    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-    KIND, either express or implied.  See the License for the
-    specific language governing permissions and limitations
-    under the License.
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
  */
 
 package de.jwi.jspwiki.git;
@@ -25,7 +23,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
+import java.util.TimeZone;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -63,18 +63,18 @@ public class GitController
 		repository = git.getRepository();
 	}
 
-	public void commit(File f, GitVersion gitVersion) throws GitException
+	public void commit(File f, PageMetaData metaData) throws GitException
 	{
 		String name = f.getName();
 
-		String message = gitVersion.changenote;
+		String message = metaData.changenote;
 
 		if (message == null)
 		{
 			message = "no commit message";
 		}
 
-		PersonIdent ident = new PersonIdent(gitVersion.author, gitVersion.email);
+		PersonIdent ident = new PersonIdent(metaData.author, metaData.email, metaData.commitTime, TimeZone.getDefault());
 
 		try
 		{
@@ -91,36 +91,36 @@ public class GitController
 		}
 	}
 
-	public List<GitVersion> getVersionHistory(String fileName, boolean readFileSize) throws GitException
+	public List<PageMetaData> getVersionHistory(String fileName, boolean readFileSize) throws GitException
 	{
-		List<GitVersion> versions = new ArrayList<GitVersion>();
+		List<PageMetaData> metaDataList = new ArrayList<PageMetaData>();
 
 		try
 		{
-			Iterable<RevCommit> logs = git.log().addPath(fileName).call();
-
-			for (RevCommit rev : logs)
+			Iterator<RevCommit> it = git.log().addPath(fileName).call().iterator();
+			while (it.hasNext())
 			{
-				GitVersion gitVersion = new GitVersion();
-				versions.add(gitVersion);
+				RevCommit rev = it.next();
+				PageMetaData metaData = new PageMetaData();
+				metaDataList.add(metaData);
 
 				String changenote = rev.getFullMessage();
 				PersonIdent authorIdent = rev.getAuthorIdent();
 				int commitTime = rev.getCommitTime(); // seconds since the epoch
 				long ms = (long) commitTime * 1000;
 
-				gitVersion.fileName = fileName;
-				gitVersion.author = authorIdent.getName();
-				gitVersion.changenote = changenote;
-				gitVersion.commitTime = new Date(ms);
+				metaData.fileName = fileName;
+				metaData.author = authorIdent.getName();
+				metaData.changenote = changenote;
+				metaData.commitTime = new Date(ms);
 				
 				if (readFileSize)
 				{
-					gitVersion.fileSize = readObjectSize(rev, fileName);
+					metaData.fileSize = readObjectSize(rev, fileName);
 				}
 			}
 
-			return versions;
+			return metaDataList;
 		} catch (Exception e)
 		{
 			throw new GitException(e);
@@ -157,15 +157,15 @@ public class GitController
 		ObjectReader reader = null;
 		try
 		{
-			Iterable<RevCommit> logs = git.log().addPath(name).call();
-
 			RevCommit revCommit;
 
 			List<RevCommit> commits = new ArrayList<RevCommit>();
 
-			for (RevCommit rev : logs)
+			Iterator<RevCommit> it = git.log().addPath(name).call().iterator();
+			while (it.hasNext())
 			{
-				commits.add(rev);
+				RevCommit r = it.next();
+				commits.add(r);
 			}
 
 			revCommit = commits.get(commits.size() - version);

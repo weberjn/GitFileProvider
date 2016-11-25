@@ -17,21 +17,17 @@
 
 package de.jwi.jspwiki.git;
 
-public class GitException extends Exception
+import java.util.Date;
+
+public class PageMetaData
 {
-	public GitException(String message, Throwable cause)
-	{
-		super(message, cause);
-	}
+	public String author;
+	public String email;
+	public String changenote;
+	public Date commitTime;
 
-	public GitException(String message)
-	{
-		super(message);
-	}
-
-	public GitException(Throwable cause)
-	{
-		super(cause);
-	}
-
+	public String fileName;
+	public long fileSize;
+	
+	public int version;
 }
