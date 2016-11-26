@@ -8,3 +8,13 @@ It works by committing after every page save.
 
 Right now, it is not very performant, as JSPWiki starts counting versions with the oldest, so you have to got back Gits commit history to find out how many versions there are.
 
+
+Config:
+
+```
+jspwiki.pageProvider = de.jwi.jspwiki.git.GitFileProvider
+jspwiki.attachmentProvider = de.jwi.jspwiki.git.GitAttachmentProvider
+
+jspwiki.fileSystemProvider.pageDir = /JSPWiki/wp
+jspwiki.gitAttachmentProvider.storageDir = /JSPWiki/wa
+```
